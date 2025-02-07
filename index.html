@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Angry Birds風アクションゲーム</title>
+  <style>
+    body { margin: 0; padding: 0; }
+    canvas { display: block; background: #87CEEB; }
+  </style>
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <!-- Matter.js の CDN 読み込み（バージョンは必要に応じて更新してください） -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script>
+    // モジュールのエイリアス
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          Runner = Matter.Runner,
+          World = Matter.World,
+          Bodies = Matter.Bodies,
+          Constraint = Matter.Constraint,
+          Mouse = Matter.Mouse,
+          MouseConstraint = Matter.MouseConstraint,
+          Events = Matter.Events;
+
+    // エンジンとワールドの作成
+    const engine = Engine.create();
+    const world = engine.world;
+
+    // canvas のサイズ設定
+    const canvas = document.getElementById('world');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // レンダラーの作成
+    const render = Render.create({
+      canvas: canvas,
+      engine: engine,
+      options: {
+        width: canvas.width,
+        height: canvas.height,
+        wireframes: false, // 実際の色を表示
+        background: '#87CEEB'
+      }
+    });
+    Render.run(render);
+
+    // ランナーの作成
+    const runner = Runner.create();
+    Runner.run(runner, engine);
+
+    // 地面（静的オブジェクト）
+    const ground = Bodies.rectangle(canvas.width / 2, canvas.height - 50, canvas.width, 100, { isStatic: true });
+    World.add(world, ground);
+
+    // スリングショットのアンカー位置（固定点）
+    const slingX = 200;
+    const slingY = canvas.height - 300;
+
+    // 鳥（発射体）の作成
+    const bird = Bodies.circle(slingX, slingY, 20, { density: 0.004 });
+    World.add(world, bird);
+
+    // スリングショットを表現する Constraint（鳥と固定点をつなぐ）
+    let slingshot = Constraint.create({
+      pointA: { x: slingX, y: slingY },
+      bodyB: bird,
+      stiffness: 0.05,
+      render: {
+        strokeStyle: '#4a2e0b',
+        lineWidth: 5
+      }
+    });
+    World.add(world, slingshot);
+
+    // ターゲットとなる箱オブジェクトをいくつか作成
+    const boxes = [];
+    for (let i = 0; i < 5; i++) {
+      // 箱の位置やサイズは適宜調整してください
+      let box = Bodies.rectangle(600 + i * 60, canvas.height - 100 - i * 40, 50, 50);
+      boxes.push(box);
+    }
+    World.add(world, boxes);
+
+    // マウス操作の設定（ドラッグ＆リリースで鳥を操作）
+    const mouse = Mouse.create(render.canvas);
+    const mouseConstraint = MouseConstraint.create(engine, {
+      mouse: mouse,
+      constraint: {
+        stiffness: 0.02,
+        render: { visible: false }
+      }
+    });
+    World.add(world, mouseConstraint);
+    render.mouse = mouse;
+
+    // マウスで鳥をドラッグしてリリースしたときに Constraint を外して発射
+    Events.on(mouseConstraint, 'enddrag', function(event) {
+      if (event.body === bird) {
+        // 少し遅延させて Constraint を除去
+        setTimeout(() => {
+          World.remove(world, slingshot);
+          slingshot = null;
+        }, 0);
+      }
+    });
+
+    // 任意：スペースキーでリセットし、新しい鳥を生成
+    document.addEventListener('keydown', function(event) {
+      if (event.code === 'Space') {
+        // 現在の鳥を削除
+        World.remove(world, bird);
+        // 新しい鳥を作成して追加
+        const newBird = Bodies.circle(slingX, slingY, 20, { density: 0.004 });
+        World.add(world, newBird);
+        // 新しいスリングショット Constraint を追加
+        slingshot = Constraint.create({
+          pointA: { x: slingX, y: slingY },
+          bodyB: newBird,
+          stiffness: 0.05,
+          render: {
+            strokeStyle: '#4a2e0b',
+            lineWidth: 5
+          }
+        });
+        World.add(world, slingshot);
+      }
+    });
+
+    // シーン全体が見えるようにレンダラーのビューポートを調整
+    Render.lookAt(render, {
+      min: { x: 0, y: 0 },
+      max: { x: canvas.width, y: canvas.height }
+    });
+  </script>
+</body>
+</html>
